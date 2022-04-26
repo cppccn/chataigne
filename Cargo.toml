@@ -1,0 +1,16 @@
+[package]
+name = "ch"
+description = "Chataigne project executable"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+directories = "4.0"
+config = "0.11"
+anyhow = "1"
+serde_derive = "1.0.136"
+serde = "1.0.136"
+walkdir = "2.3"
+clap = { version = "3.1.12", features = ["derive"] }

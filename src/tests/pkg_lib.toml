@@ -1,0 +1,11 @@
+[package]
+name="gtest"
+src={git="https://github.com/google/googletest.git", commit="e2239ee"}
+version="1.11.0"
+description="GoogleTest - Google Testing and Mocking Framework"
+
+
+[lib]
+headers=["./googletest/include", "./googletest"]
+builds=["./googletest/src/gtest-all.cc"]
+opt=["pthread"]

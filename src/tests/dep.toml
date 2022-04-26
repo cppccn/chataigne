@@ -1,0 +1,6 @@
+[package]
+name="sample_test"
+version="0.1.0"
+
+[test_dependencies]
+gtest="1.11.0"
