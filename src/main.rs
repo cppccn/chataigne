@@ -1,5 +1,5 @@
 use clap::StructOpt;
-use cli::Commands;
+use cli::{Cli, Commands};
 use cmd::compile;
 use settings::Settings;
 
@@ -8,6 +8,8 @@ mod cmd;
 mod common;
 mod pkg;
 mod settings;
+
+const DEFAULT_PACKAGE_FILE_NAME: &str = "chataigne.toml";
 
 #[cfg(test)]
 mod tests;
@@ -18,21 +20,22 @@ fn main() {
     // todo: take second argument "build", "warn", "fmt", install.
     // todo: if unknown argument, search in ProjectDirs/bin the binary to call
     // todo: nice unwrap handling
-    // todo, replace println with tracing. use verbosity as argument / settings
     let settings = Settings::new().unwrap();
-    let cli = &cli::Cli::parse();
+    let cli: &Cli = &cli::Cli::parse();
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(cli.verbosity())
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     if let Some(cmd) = &cli.command {
         match cmd {
             Commands::Build(cmd) => {
-                let root_pkg_file = pkg::read(Some("luc.toml".to_string())).unwrap();
+                let root_pkg_file = pkg::read(Some(DEFAULT_PACKAGE_FILE_NAME.to_string())).unwrap();
                 let level = cmd.compilation_level();
                 compile(root_pkg_file, &settings, level).unwrap();
             }
-            Commands::New { name } => {
-                todo!("generate {name} hello world")
-            }
+            Commands::New { name } => cmd::new(name),
             Commands::Test => {
-                let root_pkg_file = pkg::read(Some("luc.toml".to_string())).unwrap();
+                let root_pkg_file = pkg::read(Some(DEFAULT_PACKAGE_FILE_NAME.to_string())).unwrap();
                 cmd::test(root_pkg_file, &settings, 3).unwrap();
             }
             _ => todo!(),

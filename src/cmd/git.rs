@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+use tracing::debug;
 
 /// Checkout source folder if needed from `Src` object.
 ///
@@ -41,6 +42,7 @@ pub fn checkout_dependency(
         DepVal::Path(path) => Ok(path.to_owned()),
         _ => bail!("cannot get path dependency of {}", pkg_file.package.name),
     }
+
     // todo, implement for other depvals
     // todo manage each case in specific function, implement checkout in another file.
 }
@@ -48,16 +50,17 @@ pub fn checkout_dependency(
 /// Clone a repository into `dest`, optionnaly checkout something, a tag, a
 /// commit...
 pub fn git_clone(url: &str, checkout: &Option<String>, dest_path: &Path) {
+    debug!("check repository at {}", dest_path.to_string_lossy());
     let dest = dest_path.file_name().unwrap().to_string_lossy();
     let parent = dest_path.parent().unwrap();
     if !dest_path.is_dir() {
-        println!("clone repository {url}");
+        debug!("clone repository {url} at {}", dest_path.to_string_lossy());
         let mut cmd = Command::new("git");
         cmd.args(vec!["clone", url, &dest]).current_dir(parent);
         internal_run(cmd);
     }
     if let Some(h) = checkout {
-        println!("repository cloned, checkout {h}");
+        debug!("repository cloned, checkout {h}");
         let mut cmd = Command::new("git");
         cmd.args(vec!["checkout", h]).current_dir(dest_path);
         internal_run(cmd);

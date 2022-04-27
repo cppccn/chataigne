@@ -1,7 +1,8 @@
 use crate::{
+    cmd::git_clone,
     common::types::DepVal,
     pkg::read,
-    settings::{self, Settings},
+    settings::{self, Layer, Settings},
 };
 
 use super::types::{Dependency, PackagePaths, PkgFile, StaticLib};
@@ -10,6 +11,7 @@ use std::{
     collections::HashSet,
     path::{Path, PathBuf},
 };
+use tracing::debug;
 use walkdir::WalkDir;
 
 const DEFAULT_PACKAGE_FILE_NAME: &str = "luc.toml";
@@ -24,7 +26,7 @@ pub fn package_paths(path: &Path) -> Result<PackagePaths> {
     // todo: return an error if a cyclic path found.
     // todo: add `ignore` parameter in pkg_file.
     // todo: find any file that end with the given extensions from pkg_file.
-    println!("package path walk from {}", path.to_string_lossy());
+    debug!("package path walk from {}", path.to_string_lossy());
     let mut source_files = HashSet::new();
     let mut header_folders = HashSet::new();
     let base = path.to_path_buf();
@@ -41,7 +43,7 @@ pub fn package_paths(path: &Path) -> Result<PackagePaths> {
         // todo: don't add sub folders into result. add to ignore
         if f_name.ends_with(".h") {
             let e = entry.path().parent().unwrap().strip_prefix(&base).unwrap();
-            println!("include folder found at {}", e.to_string_lossy());
+            debug!("include folder found at {}", e.to_string_lossy());
             header_folders.insert(e.to_path_buf());
         }
     }
@@ -54,7 +56,7 @@ pub fn package_paths(path: &Path) -> Result<PackagePaths> {
 // todo: better manage that. Maybe everywhere we could use a Pkg instead of
 //       PkgFile that implement all of that stuff
 pub fn lib_package_path(lib: &StaticLib, src_path: &Path) -> Result<PackagePaths> {
-    println!("compile paths for {}", src_path.to_string_lossy());
+    debug!("compile paths for {}", src_path.to_string_lossy());
     // todo: replace unwraps with error management
     let mut source_files = HashSet::from_iter(lib.builds.iter().map(|src| src.into()));
     let mut header_folders = HashSet::from_iter(lib.headers.iter().map(|src| src.into()));
@@ -81,6 +83,25 @@ pub fn concat(root: &Path, file: &str) -> String {
     ret.to_str().unwrap().to_string()
 }
 
+/// Find layer directory, in case of a git repository, clone
+pub fn get_layer_directory(layer: &Layer, settings: &Settings) -> Result<PathBuf> {
+    match layer {
+        settings::Layer::Git(git) => {
+            let mut p = settings.project_dirs.cache_dir().to_path_buf();
+            p.push(sha256::digest(&git.git));
+            git_clone(&git.git, &None, &p);
+            Ok(p)
+        }
+        settings::Layer::Dir(dir) => {
+            if std::fs::metadata(&dir.path).is_ok() {
+                Ok(PathBuf::from(dir.path.clone()))
+            } else {
+                bail!("Broken link to layer {}", dir.path)
+            }
+        }
+    }
+}
+
 // todo: return better errors, readable by final user
 // todo, clone git layers
 // todo, clone git dependency
@@ -96,28 +117,17 @@ pub fn concat(root: &Path, file: &str) -> String {
 /// running the compilation of each lib. It's done in [compile_lib] with the
 /// usefull function [checkout].
 pub fn find_pkg(dependency: &Dependency, settings: &Settings) -> Result<PkgFile> {
-    println!("Load dependency {} pkgfile", dependency.name);
+    debug!("Load dependency {} pkgfile", dependency.name);
     match &dependency.desc {
         DepVal::Version(version) => {
             for layer in &settings.layers {
                 // todo, by default check filesystem for layers, but if
                 // git repository, clone the layer before
-                let dir = match layer {
-                    settings::Layer::Git(_) => todo!("clone repo if not done and return path"),
-                    settings::Layer::Dir(dir) => {
-                        if std::fs::metadata(dir).is_ok() {
-                            dir
-                        } else {
-                            bail!("Broken link to layer {dir}")
-                        }
-                    }
-                };
-                let mut p = PathBuf::from(dir);
-                p.push(dir);
-                p.push(&dependency.name);
-                p.push(format!("{version}.toml"));
-                if p.is_file() {
-                    return read(Some(p.to_str().unwrap().to_string()));
+                let mut dir = get_layer_directory(layer, settings)?;
+                dir.push(&dependency.name);
+                dir.push(format!("{version}.toml"));
+                if dir.is_file() {
+                    return read(Some(dir.to_str().unwrap().to_string()));
                 }
             }
         }

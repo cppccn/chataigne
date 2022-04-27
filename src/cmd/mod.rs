@@ -1,12 +1,8 @@
-use crate::{
-    cmd::gcc::{compile_lib, compile_pkg, link},
-    common::{tools::find_pkg, types::PkgFile},
-    Settings,
-};
-use anyhow::Result;
 use std::process::Command;
 mod gcc;
 mod git;
+mod new;
+
 // todo: error on cyclic dependencies
 // todo: manage pkg file, clone repo if git, checkout if commit, in any
 //       case, compile if `lib` as a static lib and remember to add it in
@@ -19,36 +15,13 @@ mod git;
 // todo: find versions incompatibilities
 
 /// Full compilation of a
-pub fn compile(pkg_file: PkgFile, settings: &Settings, compile_level: usize) -> Result<()> {
-    let mut headers = vec![];
-    let mut opts = vec![];
-    let mut dependencies = pkg_file.get_dependencies(compile_level);
-    println!("Start compilation of {}", pkg_file.package.name);
-    // todo: some paralelisation can be done here
-    while !dependencies.is_empty() {
-        let dependency = dependencies.pop_back().unwrap();
-        let pkg_file = find_pkg(&dependency, settings)?;
-        let (h, o) = compile_lib(&dependency, &pkg_file, settings);
-        headers.extend(h);
-        opts.extend(o);
-        dependencies.extend(pkg_file.get_dependencies(compile_level));
-    }
+pub use gcc::{compile, test};
+pub use git::git_clone;
+pub use new::new;
+use tracing::debug;
 
-    let objects = compile_pkg(headers, compile_level == 3);
-    link(&pkg_file.package.name, &opts, objects);
-    Ok(())
-}
-
-pub fn test(pkg_file: PkgFile, settings: &Settings, compile_level: usize) -> Result<()> {
-    let n = pkg_file.package.name.clone();
-    compile(pkg_file, settings, compile_level)?;
-    println!("test ./target/{n}");
-    let c = Command::new(format!("./target/{n}")).spawn()?;
-    c.wait_with_output().unwrap();
-    Ok(())
-}
-
+/// Tooling, launch given command line
 fn internal_run(mut cmd: Command) {
-    println!("run: {:?}", cmd);
+    debug!("run: {:?}", cmd);
     cmd.output().unwrap();
 }

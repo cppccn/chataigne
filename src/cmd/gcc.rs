@@ -7,12 +7,50 @@
 use crate::{
     cmd::{git::checkout_dependency, internal_run},
     common::{
-        tools::{self, lib_package_path, package_paths},
-        types::{Dependency, PkgFile},
+        tools::{self, find_pkg, lib_package_path, package_paths},
+        types::{DepVal, Dependency, PkgFile},
     },
     settings::Settings,
 };
-use std::{collections::HashSet, path::PathBuf, process::Command};
+use anyhow::Result;
+use colored::Colorize;
+use std::{collections::HashSet, path::PathBuf, process::Command, sync::Once};
+use tracing::debug;
+
+pub fn compile(pkg_file: PkgFile, settings: &Settings, compile_level: usize) -> Result<()> {
+    let mut headers = vec![];
+    let mut opts = vec![];
+    let mut dependencies = pkg_file.get_dependencies(compile_level);
+    debug!("Start compilation of {}", pkg_file.package.name);
+    // todo: some paralelisation can be done here,
+    // 1. separate git clones and compilation
+    // 2. if checksums ok, compile all in paralel, otherwise check what we
+    //    need to recompile
+    while !dependencies.is_empty() {
+        let dependency = dependencies.pop_back().unwrap();
+        let pkg_file = find_pkg(&dependency, settings)?;
+        let (h, o) = compile_lib(&dependency, &pkg_file, settings);
+        headers.extend(h);
+        opts.extend(o);
+        dependencies.extend(pkg_file.get_dependencies(compile_level));
+    }
+
+    let objects = compile_pkg(&pkg_file, headers);
+    link(&pkg_file.package.name, &opts, objects);
+    println!("{}", "Finishing".green());
+    Ok(())
+}
+
+/// Run a compilation with the test dependencies, use the `[test]` object in
+/// the settings to modify the build options, sources etc. (Nothing to do by
+/// default) and launch the output.
+pub fn test(pkg_file: PkgFile, settings: &Settings, compile_level: usize) -> Result<()> {
+    let n = pkg_file.package.name.clone();
+    compile(pkg_file, settings, compile_level)?;
+    let c = Command::new(format!("./target/{n}")).spawn()?;
+    c.wait_with_output().unwrap();
+    Ok(())
+}
 
 /// Compile library for a static linking. Return a tuple containing a list of
 /// headers (folders containing) and a list of options that the main program
@@ -22,24 +60,21 @@ pub fn compile_lib(
     pkg_file: &PkgFile,
     settings: &Settings,
 ) -> (HashSet<String>, HashSet<String>) {
-    println!("compile lib {}", dependency.name);
+    debug!("compile lib {}", dependency.name);
     let mut headers = HashSet::new();
     let mut opts = HashSet::new();
     if let Some(lib) = &pkg_file.lib {
         let dep_path = checkout_dependency(dependency, pkg_file, settings).unwrap();
-        println!("compile lib from path {}", dep_path.to_string_lossy());
+        debug!("compile lib from path {}", dep_path.to_string_lossy());
         let pkg_paths = lib_package_path(lib, &dep_path).unwrap();
 
+        let once = Once::new();
         for src in &pkg_paths.source_files {
             let mut cmd = Command::new("g++");
-            let output = pkg_file
-                .package
-                .object_path(src, settings)
-                .to_str()
-                .unwrap()
-                .to_string();
-            cmd.args(vec!["-o", &output]);
-            opts.insert(output);
+            let output = pkg_file.package.object_path(src, settings);
+            let output_str = output.to_str().unwrap().to_string();
+            cmd.args(vec!["-o", &output_str]);
+            opts.insert(output_str);
             if let Some(opt) = &lib.opt {
                 opts.extend(opt.iter().cloned())
             }
@@ -51,6 +86,25 @@ pub fn compile_lib(
                 headers.insert(h);
             }
             cmd.arg(tools::concat(&dep_path, &src.to_string_lossy()));
+            match &dependency.desc {
+                DepVal::Version(_) => {
+                    if output.is_file() {
+                        continue;
+                    }
+                }
+                DepVal::Git(_) => todo!("git dependencies are not ready"),
+                _ => {} // todo: don't compile if checksum unchanged
+            };
+
+            once.call_once(|| {
+                println!(
+                    "{} {} {}",
+                    "Compiling".green(),
+                    pkg_file.package.name,
+                    pkg_file.package.version
+                )
+            });
+
             internal_run(cmd);
         }
     }
@@ -59,7 +113,7 @@ pub fn compile_lib(
 
 /// Compilation of a package given all static library `headers` dependencies
 /// without links.
-pub fn compile_pkg(headers: Vec<String>, test: bool) -> Vec<PathBuf> {
+pub fn compile_pkg(pkg_file: &PkgFile, headers: Vec<String>) -> Vec<PathBuf> {
     let opts = headers
         .iter()
         .flat_map(|h| vec![String::from("-I"), h.clone()])
@@ -67,15 +121,6 @@ pub fn compile_pkg(headers: Vec<String>, test: bool) -> Vec<PathBuf> {
     let paths = package_paths(&PathBuf::from(".")).unwrap();
     let mut objects = vec![];
     for src in &paths.source_files {
-        if test
-            && !src
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .starts_with("test_")
-        {
-            continue;
-        }
         let mut cmd = Command::new("g++");
         cmd.args(&opts);
         cmd.args(
@@ -97,6 +142,13 @@ pub fn compile_pkg(headers: Vec<String>, test: bool) -> Vec<PathBuf> {
             &obj_path.to_string_lossy(),
         ]);
         objects.push(obj_path);
+        // todo: don't compile if checksum unchanged
+        println!(
+            "{} {} {}",
+            "Compiling".green(),
+            pkg_file.package.name,
+            pkg_file.package.version
+        );
         internal_run(cmd);
     }
     objects

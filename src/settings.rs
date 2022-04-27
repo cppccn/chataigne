@@ -1,7 +1,11 @@
+use std::path::Path;
+
 use anyhow::{bail, Result};
-use config::{Config, File};
+use config::{Config, File, Value};
 use directories::ProjectDirs;
 use serde_derive::Deserialize;
+
+use crate::common::types::{GitTarget, LocalTarget};
 
 /// An overlay in a folder or a git repository that have a folder architecture
 /// like:
@@ -16,15 +20,15 @@ use serde_derive::Deserialize;
 ///     ...
 /// ...
 pub enum Layer {
-    Git(String),
-    Dir(String),
+    Git(GitTarget),
+    Dir(LocalTarget),
 }
 
 #[derive(Deserialize)]
 struct SettingFile {
     // todo: g++ binary direcory
     #[serde(default)]
-    pub layers: Vec<String>,
+    pub layers: Vec<Value>,
     // todo: conservation of .o, cache management
     // todo: compiler default flags
 }
@@ -34,12 +38,12 @@ impl SettingFile {
         self.layers
             .iter()
             .map(|s| {
-                if s.starts_with("git:") {
-                    Layer::Git(s.clone().drain(4..).collect())
-                } else if s.starts_with("dir:") {
-                    Layer::Dir(s.clone().drain(4..).collect())
+                if let Ok(git) = s.clone().try_into::<GitTarget>() {
+                    Layer::Git(git)
+                } else if let Ok(local) = s.clone().try_into::<LocalTarget>() {
+                    Layer::Dir(local)
                 } else {
-                    Layer::Dir(s.clone())
+                    panic!("unknown layer format")
                 }
             })
             .collect()
@@ -51,15 +55,32 @@ pub struct Settings {
     pub project_dirs: ProjectDirs,
 }
 
+/// Initialisation for the first use of chataigne
+fn init(config: &Path, cache: &Path) {
+    if config.is_dir() && cache.is_dir() {
+        return;
+    }
+    std::fs::create_dir_all(config).unwrap();
+    std::fs::create_dir_all(cache).unwrap();
+    let mut settings = config.to_path_buf();
+    settings.push("settings.toml");
+    std::fs::write(
+        settings,
+        r#"layers = [{git="https://github.com/adrien-zinger/layer_test_ch.git"}]"#,
+    )
+    .unwrap();
+}
+
 impl Settings {
     pub fn new() -> Result<Self> {
-        let project_dirs = match ProjectDirs::from("com", "cppccn", "luc") {
+        let project_dirs = match ProjectDirs::from("com", "cppccn", "chataigne") {
             Some(project_dirs) => project_dirs,
             // todo: create default file instead of just returning default setting
             None => bail!("Failed to instanciate or get project directories"),
         };
         let mut config = Config::default();
         let mut config_path = project_dirs.config_dir().to_path_buf();
+        init(&config_path, project_dirs.cache_dir());
         config_path.push("settings.toml");
         config.merge(File::with_name(&config_path.to_string_lossy()))?;
         let setting_file = config.try_into::<SettingFile>()?;
