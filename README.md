@@ -78,7 +78,8 @@ The command `ch build` generate a target folder with `{package.name}`
 executable. `ch run` will generate and run the target.
 
 By default, the `dev` version is generated with the chataigne build. If you
-need to build or run the release version, use flags `--release` or `--dev`.
+need to build or run the release or test version, use the flag `--release`
+or `--test`.
 
 ## Roadmap
 
