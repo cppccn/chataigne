@@ -8,21 +8,50 @@ use serde_derive::Deserialize;
 
 use crate::settings::Settings;
 
+/// Parse the build options in package files. Will be adapted into
+/// [BuildOption], don't use that structure outside deserialization.
+#[derive(Deserialize, Default)]
+pub struct _BuildOption {
+    #[serde(default)]
+    pub ignore: Vec<String>,
+    pub dependencies: Option<HashMap<String, Value>>,
+    pub sources: Option<Vec<String>>,
+    pub includes: Option<Vec<String>>,
+}
+
+/// Same as [_BuildOption] but after a little adaptation to be used in rust
+/// code.
+pub struct BuildOption {
+    pub ignore: Vec<String>,
+    pub dependencies: Option<HashMap<String, DepVal>>,
+    pub sources: Option<Vec<String>>,
+    pub includes: Option<Vec<String>>,
+}
+
 #[derive(Deserialize)]
 pub struct _PkgFile {
     pub package: _Package,
+    #[serde(default)]
+    pub ignore: Vec<String>,
+    #[serde(default)]
+    pub dev: _BuildOption,
+    #[serde(default)]
+    pub test: _BuildOption,
+    pub sources: Option<Vec<String>>,
+    pub includes: Option<Vec<String>>,
     pub dependencies: Option<HashMap<String, Value>>,
-    pub dev_dependencies: Option<HashMap<String, Value>>,
-    pub test_dependencies: Option<HashMap<String, Value>>,
     // todo: we can also have a shared library or dynamic.
     pub lib: Option<StaticLib>,
 }
 
+/// Package as describen in the package part in the package file. Don't use that struct in general.
+/// It's used only for deserialization. [Package] structure has a form simplier to use.
 #[derive(Deserialize)]
 pub struct _Package {
     pub name: String,
     pub version: String,
     pub description: Option<String>,
+    pub authors: Option<Vec<String>>,
     pub src: Option<Value>,
     pub repostory: Option<String>,
 }
@@ -98,8 +127,11 @@ pub struct Package {
 pub struct PkgFile {
     pub package: Package,
     pub dependencies: Option<HashMap<String, DepVal>>,
-    pub dev_dependencies: Option<HashMap<String, DepVal>>,
-    pub test_dependencies: Option<HashMap<String, DepVal>>,
+    pub ignore: Vec<String>,
+    pub dev: BuildOption,
+    pub test: BuildOption,
+    pub sources: Option<Vec<String>>,
+    pub includes: Option<Vec<String>>,
     // todo: we can also have a shared library or dynamic.
     pub lib: Option<StaticLib>,
 }

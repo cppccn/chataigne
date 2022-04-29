@@ -5,7 +5,7 @@
 // todo, replace unwraps with error management
 
 use crate::{
-    cmd::{git::checkout_dependency, internal_run},
+    cmd::git::checkout_dependency,
     common::{
         tools::{self, find_pkg, lib_package_path, package_paths},
         types::{DepVal, Dependency, PkgFile},
@@ -29,13 +29,13 @@ pub fn compile(pkg_file: PkgFile, settings: &Settings, compile_level: usize) -> 
     while !dependencies.is_empty() {
         let dependency = dependencies.pop_back().unwrap();
         let pkg_file = find_pkg(&dependency, settings)?;
-        let (h, o) = compile_lib(&dependency, &pkg_file, settings);
+        let (h, o) = compile_lib(&dependency, &pkg_file, settings, compile_level);
         headers.extend(h);
         opts.extend(o);
         dependencies.extend(pkg_file.get_dependencies(compile_level));
     }
 
-    let objects = compile_pkg(&pkg_file, headers);
+    let objects = compile_pkg(&pkg_file, headers, compile_level);
     link(&pkg_file.package.name, &opts, objects);
     println!("{}", "Finishing".green());
     Ok(())
@@ -59,6 +59,7 @@ pub fn compile_lib(
     dependency: &Dependency,
     pkg_file: &PkgFile,
     settings: &Settings,
+    compile_level: usize,
 ) -> (HashSet<String>, HashSet<String>) {
     debug!("compile lib {}", dependency.name);
     let mut headers = HashSet::new();
@@ -66,7 +67,8 @@ pub fn compile_lib(
     if let Some(lib) = &pkg_file.lib {
         let dep_path = checkout_dependency(dependency, pkg_file, settings).unwrap();
         debug!("compile lib from path {}", dep_path.to_string_lossy());
-        let pkg_paths = lib_package_path(lib, &dep_path).unwrap();
+        let pkg_paths =
+            lib_package_path(lib, &dep_path, pkg_file.get_ignore(compile_level)).unwrap();
 
         let once = Once::new();
         for src in &pkg_paths.source_files {
@@ -113,12 +115,12 @@ pub fn compile_lib(
 
 /// Compilation of a package given all static library `headers` dependencies
 /// without links.
-pub fn compile_pkg(pkg_file: &PkgFile, headers: Vec<String>) -> Vec<PathBuf> {
+pub fn compile_pkg(pkg_file: &PkgFile, headers: Vec<String>, compile_level: usize) -> Vec<PathBuf> {
     let opts = headers
         .iter()
         .flat_map(|h| vec![String::from("-I"), h.clone()])
         .collect::<Vec<String>>();
-    let paths = package_paths(&PathBuf::from(".")).unwrap();
+    let paths = package_paths(&PathBuf::from("."), pkg_file.get_ignore(compile_level)).unwrap();
     let mut objects = vec![];
     for src in &paths.source_files {
         let mut cmd = Command::new("g++");
@@ -164,4 +166,14 @@ pub fn link(package_name: &str, opts: &Vec<String>, objects: Vec<PathBuf>) {
         .args(vec!["-o", &format!("target/{package_name}")])
         .args(objects.iter().map(|p| p.to_string_lossy().to_string()));
     internal_run(cmd);
+}
+
+/// Tooling, launch given command line
+fn internal_run(mut cmd: Command) {
+    debug!("run: {:?}", cmd);
+    let c = cmd.spawn().unwrap();
+    c.wait_with_output().unwrap();
+    //if !c.wait_with_output().unwrap().status.success() {
+    //    panic!("{}", "compile error".red().bold())
+    //}
 }

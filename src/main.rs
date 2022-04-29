@@ -38,7 +38,6 @@ fn main() {
                 let root_pkg_file = pkg::read(Some(DEFAULT_PACKAGE_FILE_NAME.to_string())).unwrap();
                 cmd::test(root_pkg_file, &settings, 3).unwrap();
             }
-            _ => todo!(),
         };
     }
 }

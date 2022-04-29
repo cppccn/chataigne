@@ -40,11 +40,7 @@ impl BuildSubCommand {
 #[derive(Subcommand)]
 pub enum Commands {
     Build(BuildSubCommand),
-    Clean,
-    Clear,
-    Check,
     Test,
-    Fmt,
     New { name: String },
 }
 
@@ -54,8 +50,4 @@ pub struct BuildSubCommand {
     pub release: bool,
     #[clap(short, long)]
     pub test: bool,
-    #[clap(short, long)]
-    pub lib: bool,
-    #[clap(short, long)]
-    pub shared: bool,
 }

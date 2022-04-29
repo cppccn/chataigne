@@ -7,6 +7,7 @@ use crate::{
 
 use super::types::{Dependency, PackagePaths, PkgFile, StaticLib};
 use anyhow::{bail, Result};
+use glob::Pattern;
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
@@ -22,7 +23,7 @@ const DEFAULT_PACKAGE_FILE_NAME: &str = "luc.toml";
 /// of any `.h` file. A package can overides these extensions with the `build`
 /// and `include` parameters. Inverse is also possible, all path containing
 /// something in the `ignore` parameter in package file will be really ignored.
-pub fn package_paths(path: &Path) -> Result<PackagePaths> {
+pub fn package_paths(path: &Path, ignore: &Vec<String>) -> Result<PackagePaths> {
     // todo: return an error if a cyclic path found.
     // todo: add `ignore` parameter in pkg_file.
     // todo: find any file that end with the given extensions from pkg_file.
@@ -30,12 +31,22 @@ pub fn package_paths(path: &Path) -> Result<PackagePaths> {
     let mut source_files = HashSet::new();
     let mut header_folders = HashSet::new();
     let base = path.to_path_buf();
-    for entry in WalkDir::new(path)
+    'walk: for entry in WalkDir::new(path)
         .follow_links(true)
         .into_iter()
         .filter_map(|e| e.ok())
     {
+        debug!("ignore paths {:?}", ignore);
+
+        for ig in ignore {
+            if Pattern::new(ig).unwrap().matches_path(entry.path()) {
+                debug!("ignoring {:?}", entry.path());
+                continue 'walk;
+            }
+        }
         let f_name = entry.file_name().to_string_lossy();
+        debug!("path {:?}", entry.path());
+
         if f_name.ends_with(".cpp") {
             source_files.insert(entry.path().strip_prefix(&base).unwrap().to_path_buf());
         }
@@ -55,14 +66,18 @@ pub fn package_paths(path: &Path) -> Result<PackagePaths> {
 
 // todo: better manage that. Maybe everywhere we could use a Pkg instead of
 //       PkgFile that implement all of that stuff
-pub fn lib_package_path(lib: &StaticLib, src_path: &Path) -> Result<PackagePaths> {
+pub fn lib_package_path(
+    lib: &StaticLib,
+    src_path: &Path,
+    ignore: &Vec<String>,
+) -> Result<PackagePaths> {
     debug!("compile paths for {}", src_path.to_string_lossy());
     // todo: replace unwraps with error management
     let mut source_files = HashSet::from_iter(lib.builds.iter().map(|src| src.into()));
     let mut header_folders = HashSet::from_iter(lib.headers.iter().map(|src| src.into()));
 
     if source_files.is_empty() || header_folders.is_empty() {
-        let pkg_paths = package_paths(src_path).unwrap();
+        let pkg_paths = package_paths(src_path, ignore).unwrap();
         if source_files.is_empty() {
             source_files = pkg_paths.source_files;
         }

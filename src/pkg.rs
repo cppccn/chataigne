@@ -1,8 +1,10 @@
 use crate::{
     common::types::{
-        DepVal, Dependency, GitTarget, LocalTarget, Package, PkgFile, SrcVal, _Package, _PkgFile,
+        BuildOption, DepVal, Dependency, GitTarget, LocalTarget, Package, PkgFile, SrcVal,
+        _BuildOption, _Package, _PkgFile,
     },
     settings::Settings,
+    DEFAULT_PACKAGE_FILE_NAME,
 };
 use anyhow::{bail, Result};
 use config::{Config, File, Value};
@@ -46,18 +48,20 @@ impl PkgFile {
                     .map(|(k, v)| (k.clone(), v.clone())),
             )
         }
-        if self.dev_dependencies.is_some() && compile_level >= 2 {
+        if self.dev.dependencies.is_some() && compile_level >= 2 {
             map.extend(
-                self.dev_dependencies
+                self.dev
+                    .dependencies
                     .clone()
                     .unwrap()
                     .iter()
                     .map(|(k, v)| (k.clone(), v.clone())),
             );
         }
-        if self.test_dependencies.is_some() && compile_level == 3 {
+        if self.test.dependencies.is_some() && compile_level == 3 {
             map.extend(
-                self.test_dependencies
+                self.test
+                    .dependencies
                     .clone()
                     .unwrap()
                     .iter()
@@ -68,6 +72,17 @@ impl PkgFile {
             name: pkg_name.clone(),
             desc: value.clone(),
         }))
+    }
+
+    /// Get patterns of files and folders we want to ignores corresponding to
+    /// the compilation level. 1: release, 2: dev, 3: test. Ignore doesn't
+    /// inherits like the dependencies.
+    pub fn get_ignore(&self, compile_level: usize) -> &Vec<String> {
+        match compile_level {
+            2 => &self.dev.ignore,
+            3 => &self.test.ignore,
+            _ => &self.ignore,
+        }
     }
 }
 
@@ -96,22 +111,47 @@ impl TryFrom<_Package> for Package {
     }
 }
 
-impl From<_PkgFile> for PkgFile {
-    fn from(i: _PkgFile) -> Self {
+impl From<_BuildOption> for BuildOption {
+    fn from(b: _BuildOption) -> Self {
         Self {
-            package: i.package.try_into().unwrap(),
-            dependencies: DepVal::adapt(i.dependencies),
-            dev_dependencies: DepVal::adapt(i.dev_dependencies),
-            test_dependencies: DepVal::adapt(i.test_dependencies),
-            lib: i.lib,
+            ignore: b.ignore,
+            dependencies: DepVal::adapt(b.dependencies),
+            sources: b.sources,
+            includes: b.includes,
         }
     }
 }
 
+impl From<_PkgFile> for PkgFile {
+    fn from(mut i: _PkgFile) -> Self {
+        if i.dev.ignore.is_empty() {
+            i.dev.ignore.push(String::from("**/test.cpp"));
+        }
+        if i.ignore.is_empty() {
+            i.ignore.push(String::from("**/test.cpp"));
+        }
+        if i.test.ignore.is_empty() {
+            i.test.ignore.push(String::from("**/main.cpp"));
+        }
+        Self {
+            package: i.package.try_into().unwrap(),
+            dependencies: DepVal::adapt(i.dependencies),
+            dev: i.dev.into(),
+            test: i.test.into(),
+            ignore: i.ignore,
+            includes: i.includes,
+            lib: i.lib,
+            sources: i.sources,
+        }
+    }
+}
+
+/// Read a package file with name [DEFAULT_PACKAGE_FILE_NAME] or with the
+/// given `path`.
 pub fn read(path: Option<String>) -> Result<PkgFile> {
     let mut pkg_cfg = Config::default();
     pkg_cfg.merge(File::with_name(
-        &path.unwrap_or_else(|| "luc.toml".to_string()),
+        &path.unwrap_or_else(|| DEFAULT_PACKAGE_FILE_NAME.to_string()),
     ))?;
     //todo: if lib, shared lib, dyn lib a defined in the same pkg file, print warning
     let internal: _PkgFile = pkg_cfg.try_into()?;

@@ -92,6 +92,7 @@ List of features that we will add:
   - List cache packages.
   - Remove and add packages.
   - Force rebuild.
+  - List path of project's dependencies to simplify 
 - Improve error management.
   - Print gcc output in case of error.
   - Handle errors correctly with good outputs.
@@ -102,7 +103,29 @@ List of features that we will add:
   - Instead of loading libraries and building output, generate a default.nix
   - add a "pre-builded" option
   - add a "shared" option (for both dll and so)
-  
+- Sources
+  - Actually headers and sources are by default `.h` and `.cpp`, it will be
+    more flexible.
+- User feature
+  - Add a `--boilerplate` flag when creating a new project that dump a minimal
+    project.
+- Creation of a website with a documentation for layers, settings and chataigne files
+
 ## Contribute
 
 Look at the [contibute.md](CONTRIBUTE.md)
+
+## License
+
+That project is under an MIT license.
+
+<small>
+Notes about development:
+
+Even if we promise that we will not do breaking changes, there is no guaranty
+that future versions will not introduce bugs. We'll probably in a few
+month/years set a kind of stable version. We explain that because we'll try to keep
+flexibility about and accept many contributions on that project, we want to use many
+dependencies (following the same ideologie of what we want to introduce with
+chataigne).
+</small>
