@@ -1,4 +1,4 @@
-# Chataigne
+# Chataigne 🌰
 
 The project is actually a _Minimum Viable Product_ that we can use from basics to big projects.
 
