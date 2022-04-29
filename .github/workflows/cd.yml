@@ -1,0 +1,60 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - v*
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            name: release_linux.tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: release_windows.zip
+          - os: macOS-latest
+            target: x86_64-apple-darwin
+            name: release_macos.tar.gz
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: "recursive"
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+      - uses: Swatinem/rust-cache@v1
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - name: Package
+        shell: bash
+        run: |
+          mkdir chataigne && cd chataigne
+          cp -v ../target/release/ch .
+          cd ..
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]
+          then
+            7z a ${{ matrix.name }} chataigne
+          else
+            tar czvf ${{ matrix.name }} chataigne
+          fi
+          cd -
+      - name: Publish
+        uses: softprops/action-gh-release@v1
+        with:
+            files: 'release_*'
