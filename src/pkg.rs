@@ -77,7 +77,10 @@ impl PkgFile {
     /// Get patterns of files and folders we want to ignores corresponding to
     /// the compilation level. 1: release, 2: dev, 3: test. Ignore doesn't
     /// inherits like the dependencies.
-    pub fn get_ignore(&self, compile_level: usize) -> &Vec<String> {
+    pub fn get_ignore(&self, compile_level: usize, is_lib: bool) -> &Vec<String> {
+        if is_lib {
+            return &self.ignore;
+        }
         match compile_level {
             2 => &self.dev.ignore,
             3 => &self.test.ignore,
@@ -142,6 +145,7 @@ impl From<_PkgFile> for PkgFile {
             includes: i.includes,
             lib: i.lib,
             sources: i.sources,
+            opt: i.opt,
         }
     }
 }

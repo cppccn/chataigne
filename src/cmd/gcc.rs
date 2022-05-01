@@ -68,7 +68,7 @@ pub fn compile_lib(
         let dep_path = checkout_dependency(dependency, pkg_file, settings).unwrap();
         debug!("compile lib from path {}", dep_path.to_string_lossy());
         let pkg_paths =
-            lib_package_path(lib, &dep_path, pkg_file.get_ignore(compile_level)).unwrap();
+            lib_package_path(lib, &dep_path, pkg_file.get_ignore(compile_level, true)).unwrap();
 
         let once = Once::new();
         for src in &pkg_paths.source_files {
@@ -77,9 +77,7 @@ pub fn compile_lib(
             let output_str = output.to_str().unwrap().to_string();
             cmd.args(vec!["-o", &output_str]);
             opts.insert(output_str);
-            if let Some(opt) = &lib.opt {
-                opts.extend(opt.iter().cloned())
-            }
+            opts.extend(lib.opt.iter().cloned());
             cmd.arg("-c");
             // todo, create a diff between `headers` and `exports`
             for h in &pkg_paths.header_folders {
@@ -120,7 +118,11 @@ pub fn compile_pkg(pkg_file: &PkgFile, headers: Vec<String>, compile_level: usiz
         .iter()
         .flat_map(|h| vec![String::from("-I"), h.clone()])
         .collect::<Vec<String>>();
-    let paths = package_paths(&PathBuf::from("."), pkg_file.get_ignore(compile_level)).unwrap();
+    let paths = package_paths(
+        &PathBuf::from("."),
+        pkg_file.get_ignore(compile_level, false),
+    )
+    .unwrap();
     let mut objects = vec![];
     for src in &paths.source_files {
         let mut cmd = Command::new("g++");
@@ -143,6 +145,7 @@ pub fn compile_pkg(pkg_file: &PkgFile, headers: Vec<String>, compile_level: usiz
             "-o",
             &obj_path.to_string_lossy(),
         ]);
+        cmd.args(&pkg_file.opt);
         objects.push(obj_path);
         // todo: don't compile if checksum unchanged
         println!(

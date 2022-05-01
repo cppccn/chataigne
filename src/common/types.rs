@@ -34,6 +34,8 @@ pub struct _PkgFile {
     #[serde(default)]
     pub ignore: Vec<String>,
     #[serde(default)]
+    pub opt: Vec<String>,
+    #[serde(default)]
     pub dev: _BuildOption,
     #[serde(default)]
     pub test: _BuildOption,
@@ -62,7 +64,10 @@ pub struct StaticLib {
     pub headers: Vec<String>,
     #[serde(default)]
     pub builds: Vec<String>,
-    pub opt: Option<Vec<String>>,
+    #[serde(default)]
+    pub opt: Vec<String>,
+    #[serde(default)]
+    pub ignore: Vec<String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -127,6 +132,7 @@ pub struct Package {
 pub struct PkgFile {
     pub package: Package,
     pub dependencies: Option<HashMap<String, DepVal>>,
+    pub opt: Vec<String>,
     pub ignore: Vec<String>,
     pub dev: BuildOption,
     pub test: BuildOption,

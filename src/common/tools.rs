@@ -15,7 +15,7 @@ use std::{
 use tracing::debug;
 use walkdir::WalkDir;
 
-const DEFAULT_PACKAGE_FILE_NAME: &str = "luc.toml";
+const DEFAULT_PACKAGE_FILE_NAME: &str = "chataigne.toml";
 
 /// Return include paths and source files path from a root file.
 ///
@@ -152,6 +152,11 @@ pub fn find_pkg(dependency: &Dependency, settings: &Settings) -> Result<PkgFile>
                 p.push(DEFAULT_PACKAGE_FILE_NAME);
                 p
             };
+            debug!(
+                "Find pkg {} in path {}",
+                &dependency.name,
+                pkg_file_path.to_string_lossy()
+            );
             if pkg_file_path.is_file() {
                 return read(Some(pkg_file_path.to_str().unwrap().to_string()));
             }
