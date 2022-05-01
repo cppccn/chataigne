@@ -35,7 +35,7 @@ pub fn compile(pkg_file: PkgFile, settings: &Settings, compile_level: usize) -> 
         dependencies.extend(pkg_file.get_dependencies(compile_level));
     }
 
-    let objects = compile_pkg(&pkg_file, headers, compile_level);
+    let objects = compile_pkg(&pkg_file, headers, opts.clone(), compile_level);
     link(&pkg_file.package.name, &opts, objects);
     println!("{}", "Finishing".green());
     Ok(())
@@ -77,7 +77,9 @@ pub fn compile_lib(
             let output_str = output.to_str().unwrap().to_string();
             cmd.args(vec!["-o", &output_str]);
             opts.insert(output_str);
+            debug!("option {:?}", &lib.opt);
             opts.extend(lib.opt.iter().cloned());
+            cmd.args(&lib.opt);
             cmd.arg("-c");
             // todo, create a diff between `headers` and `exports`
             for h in &pkg_paths.header_folders {
@@ -113,11 +115,17 @@ pub fn compile_lib(
 
 /// Compilation of a package given all static library `headers` dependencies
 /// without links.
-pub fn compile_pkg(pkg_file: &PkgFile, headers: Vec<String>, compile_level: usize) -> Vec<PathBuf> {
-    let opts = headers
-        .iter()
-        .flat_map(|h| vec![String::from("-I"), h.clone()])
-        .collect::<Vec<String>>();
+pub fn compile_pkg(
+    pkg_file: &PkgFile,
+    headers: Vec<String>,
+    mut opts: Vec<String>,
+    compile_level: usize,
+) -> Vec<PathBuf> {
+    opts.extend(
+        headers
+            .iter()
+            .flat_map(|h| vec![String::from("-I"), h.clone()]),
+    );
     let paths = package_paths(
         &PathBuf::from("."),
         pkg_file.get_ignore(compile_level, false),
