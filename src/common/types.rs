@@ -17,6 +17,8 @@ pub struct _BuildOption {
     pub dependencies: Option<HashMap<String, Value>>,
     pub sources: Option<Vec<String>>,
     pub includes: Option<Vec<String>>,
+    #[serde(default)]
+    pub opt: Vec<String>,
 }
 
 /// Same as [_BuildOption] but after a little adaptation to be used in rust
@@ -26,6 +28,7 @@ pub struct BuildOption {
     pub dependencies: Option<HashMap<String, DepVal>>,
     pub sources: Option<Vec<String>>,
     pub includes: Option<Vec<String>>,
+    pub opt: Vec<String>,
 }
 
 #[derive(Deserialize)]

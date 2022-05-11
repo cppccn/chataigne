@@ -19,9 +19,10 @@ use tracing::debug;
 
 pub fn compile(pkg_file: PkgFile, settings: &Settings, compile_level: usize) -> Result<()> {
     let mut headers = vec![];
-    let mut opts = vec![];
+    let mut opts = pkg_file.get_opt(compile_level);
     let mut dependencies = pkg_file.get_dependencies(compile_level);
     debug!("Start compilation of {}", pkg_file.package.name);
+    debug!("Package options {:?}", opts);
     // todo: some paralelisation can be done here,
     // 1. separate git clones and compilation
     // 2. if checksums ok, compile all in paralel, otherwise check what we

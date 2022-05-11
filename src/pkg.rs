@@ -87,6 +87,18 @@ impl PkgFile {
             _ => &self.ignore,
         }
     }
+    /// Get the opt of the current package. Ignore doesn't
+    /// inherits like the dependencies.
+    pub fn get_opt(&self, compile_level: usize) -> Vec<String> {
+        if let Some(lib) = &self.lib {
+            return lib.opt.clone();
+        }
+        match compile_level {
+            2 => self.dev.opt.clone(),
+            3 => self.test.opt.clone(),
+            _ => self.opt.clone(),
+        }
+    }
 }
 
 impl TryFrom<_Package> for Package {
@@ -121,6 +133,7 @@ impl From<_BuildOption> for BuildOption {
             dependencies: DepVal::adapt(b.dependencies),
             sources: b.sources,
             includes: b.includes,
+            opt: b.opt,
         }
     }
 }
