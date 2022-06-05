@@ -1,6 +1,6 @@
 use super::internal_run;
 use crate::{
-    common::types::{DepVal, Dependency, PkgFile, SrcVal},
+    common::types::{DepVal, Dependency, Package, SrcVal},
     settings::Settings,
 };
 use anyhow::{bail, Result};
@@ -21,7 +21,7 @@ use tracing::debug;
 /// The source path is returned anyway to trace where the sources are.
 pub fn checkout_dependency(
     dependency: &Dependency,
-    pkg_file: &PkgFile,
+    package: &Package,
     settings: &Settings,
 ) -> Result<PathBuf> {
     match &dependency.desc {
@@ -30,9 +30,9 @@ pub fn checkout_dependency(
             // todo: force reload with a parameter, also add a `clear` param
             let mut dep_path = settings.project_dirs.cache_dir().to_path_buf();
             dep_path.push(&dependency.name);
-            match &pkg_file.package.src {
+            match &package.pkg_description.src {
                 Some(SrcVal::Local(_)) => {
-                    todo!("soon")
+                    todo!("checkout local dependencies will be implemented soon")
                 }
                 Some(SrcVal::Git(src)) => git_clone(&src.git, &src.commit, &dep_path),
                 None => {} // nothing to do
@@ -40,7 +40,10 @@ pub fn checkout_dependency(
             Ok(dep_path)
         }
         DepVal::Path(path) => Ok(path.to_owned()),
-        _ => bail!("cannot get path dependency of {}", pkg_file.package.name),
+        _ => bail!(
+            "cannot get path dependency of {}",
+            package.pkg_description.name
+        ),
     }
 
     // todo, implement for other depvals

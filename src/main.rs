@@ -1,12 +1,14 @@
 use clap::StructOpt;
 use cli::{Cli, Commands};
 use cmd::compile;
+use common::types::Package;
 use settings::Settings;
 
 mod cli;
 mod cmd;
 mod common;
 mod pkg;
+mod pkg_tools;
 mod settings;
 
 const DEFAULT_PACKAGE_FILE_NAME: &str = "chataigne.toml";
@@ -29,14 +31,16 @@ fn main() {
     if let Some(cmd) = &cli.command {
         match cmd {
             Commands::Build(cmd) => {
-                let root_pkg_file = pkg::read(Some(DEFAULT_PACKAGE_FILE_NAME.to_string())).unwrap();
+                let root_pkg_file =
+                    Package::read(Some(DEFAULT_PACKAGE_FILE_NAME.to_string())).unwrap();
                 let level = cmd.compilation_level();
-                compile(root_pkg_file, &settings, level).unwrap();
+                compile(&root_pkg_file, &settings, level).unwrap();
             }
             Commands::New { name } => cmd::new(name),
             Commands::Test => {
-                let root_pkg_file = pkg::read(Some(DEFAULT_PACKAGE_FILE_NAME.to_string())).unwrap();
-                cmd::test(root_pkg_file, &settings, 3).unwrap();
+                let root_pkg_file =
+                    Package::read(Some(DEFAULT_PACKAGE_FILE_NAME.to_string())).unwrap();
+                cmd::test(&root_pkg_file, &settings).unwrap();
             }
         };
     }
