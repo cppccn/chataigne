@@ -111,6 +111,7 @@ List of features that we will add:
   - Add a `--boilerplate` flag when creating a new project that dump a minimal
     project.
 - Creation of a website with a documentation for layers, settings and chataigne files
+- Format gcc error for the best readability ever
 
 ## Contribute
 
