@@ -138,13 +138,16 @@ impl Package {
     /// Get the opt of the current package. Ignore doesn't
     /// inherits like the dependencies.
     pub fn get_opt(&self, compile_level: usize) -> Vec<String> {
-        if let Some(lib) = &self.lib {
-            return lib.opt.clone();
-        }
         match compile_level {
             2 => self.dev.opt.clone(),
             3 => self.test.opt.clone(),
-            _ => self.opt.clone(),
+            _ => {
+                if let Some(lib) = &self.lib {
+                    lib.opt.clone()
+                } else {
+                    self.opt.clone()
+                }
+            }
         }
     }
 
@@ -182,7 +185,9 @@ impl Package {
         debug!("package path walk from {}", local_path.to_string_lossy());
         let mut source_files = HashSet::new();
         let mut header_folders = HashSet::new();
-        let base = local_path.to_path_buf();
+        // note, I don't remember why I removed the base :( but for
+        // now I need to try without.
+        // let base = local_path.to_path_buf();
         let ignore = self.get_ignore(compile_level);
         'walk: for entry in WalkDir::new(local_path)
             .follow_links(true)
@@ -198,12 +203,12 @@ impl Package {
             let f_name = entry.file_name().to_string_lossy();
             debug!("path {:?}", entry.path());
             if f_name.ends_with(".cpp") {
-                source_files.insert(entry.path().strip_prefix(&base).unwrap().to_path_buf());
+                source_files.insert(entry.path().to_path_buf());
             }
             // todo: don't add sub folders into result. add to ignore
             if f_name.ends_with(".h") {
-                let e = entry.path().parent().unwrap().strip_prefix(&base).unwrap();
-                debug!("include folder found at {}", e.to_string_lossy());
+                let e = entry.path().parent().unwrap();
+                debug!("include folder found at '{}'", e.to_string_lossy(),);
                 header_folders.insert(e.to_path_buf());
             }
         }
@@ -258,6 +263,8 @@ impl Package {
                 header_folders = pkg_paths.header_folders;
             }
         }
+
+        println!("headers lib: {:?}", header_folders);
 
         Ok(PackagePaths {
             header_folders,

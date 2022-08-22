@@ -67,7 +67,12 @@ pub fn compile_lib(
     let dep_path = checkout_dependency(dependency, package, settings)?;
     debug!("compile lib from path {}", dep_path.to_string_lossy());
     let pkg_paths = package.lib_package_path(&dep_path)?;
-
+    for h in &pkg_paths.header_folders {
+        println!("build {}", h.to_string_lossy());
+        let h = tools::concat(&dep_path, &h.to_string_lossy());
+        println!("to {}", h);
+        headers.insert(h);
+    }
     let once = Once::new();
     for src in &pkg_paths.source_files {
         let mut cmd = Command::new("gcc");
@@ -83,7 +88,6 @@ pub fn compile_lib(
         for h in &pkg_paths.header_folders {
             let h = tools::concat(&dep_path, &h.to_string_lossy());
             cmd.arg("-I").arg(&h);
-            headers.insert(h);
         }
         cmd.arg(tools::concat(&dep_path, &src.to_string_lossy()));
         match &dependency.desc {
@@ -121,14 +125,17 @@ pub fn compile_pkg(
     mut opts: Vec<String>,
     compile_level: usize,
 ) -> Result<Vec<PathBuf>> {
+    println!("headers {:?}", headers);
     opts.extend(
         headers
             .iter()
             .flat_map(|h| vec![String::from("-I"), h.clone()]),
     );
     let paths = package.root_package_paths(compile_level)?;
+    println!("extends: {:?}", paths.header_folders);
     let mut objects = vec![];
-    let opts = package.get_opt(compile_level);
+    opts.extend(package.get_opt(compile_level));
+    println!("opts: {:?}", opts);
     for src in &paths.source_files {
         let mut cmd = Command::new("gcc");
         cmd.args(&opts);
